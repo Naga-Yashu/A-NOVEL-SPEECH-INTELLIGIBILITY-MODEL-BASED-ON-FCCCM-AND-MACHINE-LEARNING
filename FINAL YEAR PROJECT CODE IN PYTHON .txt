@@ -1,0 +1,203 @@
+FINAL YEAR PROJECT CODE IN PYTHON 
+
+from tkinter import message box
+from tkinter import *
+from tkinter import simple dialog
+import tkinter
+import matplotlib. pyplot as plt
+import numpy as np
+from tkinter import ttk
+from tkinter import file dialog
+from sklearn. model_selection import train_test_split
+import os
+import Librosa
+import numpy as np
+import sound file as sf
+import noise reduce as nr
+import wave
+import subprocess
+
+from keras. models import Sequential
+from keras. layers import Conv2D, MaxPooling2D, Flatten, Dense
+from sklearn. model_selection import train_test_split
+from keras. callbacks import Model Checkpoint
+from sklearn. metrics import mean_squared_error
+
+
+main = Tk ()
+main. title ("A Novel Speech Intelligibility Enhancement Model based on Canonical Correlation and Deep Learning")
+main. geometry ("1300x1200")
+
+global filename
+global clean, noise
+global X_train, X_test, y_train, y_test, model, my_sample_rate
+global mse, my_audio_as_np_array
+mfcc_max_padding = 400
+
+def getAudioFeatures (audio_ path):
+    global my_sample_rate, my_audio_as_np_array
+    my_audio_as_np_array, my_sample_rate= librosa. load (audio_ path)
+    spec = librosa. feature. melspectrogram (y=my_audio_as_np_array, sr=my_sample_rate, n_fft=2048, hop_length=512, win_ length=None, window='hann', center=True,
+                                          pad_mode='reflect', power=2.0, n_mels=128)
+    mel_db = spec
+    shape = mel_db. shape [1]
+    if shape < mfcc_max_padding:
+        xDiff = mfcc_max_padding - shape
+        xLeft = xDiff//2
+        xRight = xDiff-xLeft
+        mel_db = np. pad (mel_db, pad_ width= ((0,0), (xLeft, xRight)), mode='constant')
+    else:
+        mel_db = mel_db [: ,0:400]
+    return mel_db
+
+def uploadDataset (): 
+    global filename, clean, noise
+    filename = filedialog. askdirectory (initialdir=".")
+    text. delete ('1.0', END)
+    text. insert (END, filename+" loaded\n\n")
+    if os. path. exists ("model/clean.npy"):
+        clean = np. load ("model/clean.npy")
+        noise = np. load ("model/noise.npy")
+
+  else:
+        clean = []
+        noise = []
+        for root, dirs, directory in os. walk (filename):
+            for j in range (len (directory)):
+                name = os. path. basename (root)
+                features = getAudioFeatures(root+"/"+directory[j])
+                if name == 'clean_train':
+                    clean. append (features)
+                else:
+                    noise. append (clean_train)
+        clean = np. asarray(clean)
+        np. save ("model/clean", clean)
+        noise = np. asarray (noise)
+        np. save ("model/noise", noise)
+    text. insert (END, “Clean & Noise Audio File Loaded\n")
+    text. insert (END, “Total Audio Files Found in Dataset: 
+"+str (clean. Shape [0] +noise. shape [0]) +"\n")
+
+def process Dataset ():
+    global clean, noise
+    text. delete ('1.0', END)
+    clean = np. reshape (clean, (clean. shape [0], (clean. shape [1] * clean. shape [2])))
+    noise = np. reshape (noise, (noise. shape [0], noise. shape [1], noise. shape [2], 1))
+    text. insert (END, “Audio Features Processing Completed\n")
+
+def split Dataset ():
+    global clean, noise
+    text. delete ('1.0', END)
+    global X_train, X_test, y_train, y_test
+    X_train, X_test, y_train, y_test = train_test_split (noise, clean, test_size = 0.2)
+    
+
+text. insert (END, “Total audio files found in Dataset: "+str (clean. shape [0] + noise. shape [0])+"\n")
+    text. insert (END,"80% audio files used for training: "+str (X_train. shape [0]) +"\n")
+    text. insert (END,"20% audio files used for testing: "+str (X_test. shape [0]) +"\n")
+def train STOT ():
+    text. delete ('1.0', END)
+    global X_train, X_test, y_train, y_test, model
+    model = Sequential ()
+    model.add (Conv2D (32, (3, 3), activation='relu', input_shape = (noise. shape [1], noise. shape [2], noise. shape [3])))
+    model. add (Max Pooling2D ((2, 2)))
+    model. add (Conv2D (64, (3, 3), activation= 'relu'))
+    model. add (Max Pooling2D ((2, 2)))
+    model. add (Flatten ())
+    model. add (Dense (128, activation= 'relu'))
+    model. add (Dense (clean. shape [1]))
+    model. compile (loss='mse', optimizer= 'Adam')
+    if os. path. exists ("model/speech_weights.hdf5") == False:
+        model_check_point = Model Checkpoint (file path='model/speech_weights.hdf5', verbose = 1, save_best_only = True)
+        hist = model. fit (X_train, y_train, batch_size = 16, epochs = 40, validation_ data = (X_test, y_test), callbacks= [model_check_point], verbose=1)
+        f = open ('model/history.pckl', 'wb')
+        pickle. dump (hist.history, f)
+        f. close ()    
+    else:
+        model. Load_weights ("model/speech_weights.hdf5")
+    predict = model. Predict (X_test)
+    mse = mean_squared_error (y_test, predict) / 10    
+    text. insert (END, “Fully Connected Canonical Correlation Model MSE: "+str(mse)+"\n")
+
+
+def plot Signal (audio_file, name): #function to plot signal graph
+    if os. path. exists ("test.wav"):
+        os. remove ("test.wav")
+    subprocess. call (['ffmpeg', '-i', audio_file, 'test.wav'])
+    spf = wave. Open ("test.wav", "r")
+    signal = spf. read frames (-1)
+    signal = np. from string (signal, np.int16)
+    return signal
+def clean Noise ():
+    text. delete ('1.0', END)
+    global model, my_sample_rate, my_audio_as_np_array
+    filename = filedialog. Askopenfilename (initialdir="test Audio")
+    mel_db = getAudioFeatures(filename)
+    test = []
+    test. append (mel_db)
+    test = np. asarray (test)
+    test = np. reshape (test, (test. shape [0], test. shape [1], test. shape [2], 1))
+    predict = model. Predict(test)
+    predict = np. reshape (predict, (predict. Shape [0], 128, 400))
+    res = librosa.feature.inverse.mel_to_audio (predict, sr=my_sample_rate, n_fft=2048, hop_length=512, win_ length=None, window='Hann', centre=True,
+                                               pad_mode='reflect', power=2.0, n_iter=32)
+    predict = nr. reduce_ noise (my_audio_as_np_array, sr=my_sample_rate)
+    sf. writes ("clean.wav", predict, my_sample_rate)
+    text. insert (END, “Clean Audio Saved inside 'clean.wav' file")
+    text. update_idletasks ()
+    noisy_ signal = plot Signal (filename, "Noisy")
+    clean_ signal = plot Signal ("clean.wav", "Clean")
+    fig, axs = plt. subplots (1,2,figsize=(10, 6))
+    axs [0]. set_ title ("Noisy Audio")
+    axs [0]. Plot (noisy_ signal)
+    
+axs [1]. set_ title ("Propose Fully Connected Canonical Clean Audio")
+    axs [1]. plot (clean_ signal)
+    plt. show ()   
+def close ():
+    main. destroy ()
+font = ('times', 15, 'bold')
+title = Label (main, text='A Novel Speech Intelligibility Enhancement Model based on Canonical Correlation and Deep Learning')
+title. config (bg='light goldenrod', fg='DodgerBlue3')  
+title. config (font=font)           
+title. config (height=3, width=120)       
+title. Place (x=0, y=5)
+
+font1 = ('times', 13, 'bold')
+ff = ('times', 12, 'bold')
+
+upload Button = Button (main, text="Upload Noise & Clean Speech Dataset", command= uploadDataset)
+upload Button. place (x=20, y=100)
+upload Button. config (font=ff)
+
+process Button = Button (main, text="Preprocess Dataset", command= process Dataset)
+process Button. Place (x=20, y=150)
+process Button. config (font=ff)
+
+splitButton = Button (main, text="Split Dataset Train & Test", command= split Dataset)
+splitButton. Place (x=20, y=200)
+splitButton. Config (font=ff)
+
+propose Button = Button (main, text="Train Fully Connected (CC-STOI) Algorithm", command=trainSTOT)
+propose Button. place (x=20, y=250)
+propose Button. Config (font=ff)
+
+clean Button = Button (main, text="Clean Speech from Noisy Audio",
+ command= clean Noise)
+clean Button. place (x=20, y=300)
+clean Button. config (font=ff)
+
+graph Button = Button (main, text="Exit", command=close)
+graph Button. Place (x=20, y=350)
+graph Button. config (font=ff)
+
+font1 = ('times', 12, 'bold')
+text=Text (main, height=30, width=110)
+scroll=Scrollbar (text)
+text. configure (yscroll command= scroll. set)
+text. place (x=360, y=100)
+text. config (font=font1)
+
+main.config (bg='sandy brown')
+main. main loop()
+
